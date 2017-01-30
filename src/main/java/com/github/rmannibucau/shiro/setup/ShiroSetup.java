@@ -1,17 +1,10 @@
 package com.github.rmannibucau.shiro.setup;
 
+import com.github.rmannibucau.shiro.configurer.SecurityManagerConfigurer;
 import com.github.rmannibucau.shiro.extension.ShiroExtension;
 import com.github.rmannibucau.shiro.http.AsyncContextWrapper;
-import org.apache.shiro.authc.Authenticator;
-import org.apache.shiro.authz.Authorizer;
-import org.apache.shiro.cache.CacheManager;
-import org.apache.shiro.event.EventBus;
-import org.apache.shiro.mgt.RememberMeManager;
+import org.apache.shiro.env.Environment;
 import org.apache.shiro.mgt.SecurityManager;
-import org.apache.shiro.mgt.SubjectDAO;
-import org.apache.shiro.mgt.SubjectFactory;
-import org.apache.shiro.realm.Realm;
-import org.apache.shiro.session.mgt.SessionManager;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.subject.support.SubjectThreadState;
 import org.apache.shiro.util.ThreadContext;
@@ -19,8 +12,6 @@ import org.apache.shiro.web.env.DefaultWebEnvironment;
 import org.apache.shiro.web.env.EnvironmentLoader;
 import org.apache.shiro.web.env.WebEnvironment;
 import org.apache.shiro.web.filter.mgt.FilterChainResolver;
-import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
-import org.apache.shiro.web.mgt.DefaultWebSubjectFactory;
 import org.apache.shiro.web.mgt.WebSecurityManager;
 import org.apache.shiro.web.servlet.ShiroFilter;
 
@@ -47,9 +38,8 @@ import java.util.EnumSet;
 import java.util.Set;
 
 import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.StreamSupport.stream;
 
+// note: here we depend on web module and it is fine cause if we don't have a web module then the initializer is dead code
 public class ShiroSetup implements ServletContainerInitializer {
     @Override
     public void onStartup(final Set<Class<?>> set, final ServletContext servletContext) throws ServletException {
@@ -67,40 +57,16 @@ public class ShiroSetup implements ServletContainerInitializer {
         private Instance<WebSecurityManager> manager;
 
         @Inject
-        private Instance<Realm> realm;
-
-        @Inject
-        private Instance<Authenticator> authenticator;
-
-        @Inject
-        private Instance<Authorizer> authorizer;
-
-        @Inject
-        private Instance<CacheManager> cacheManager;
-
-        @Inject
-        private Instance<EventBus> eventBus;
-
-        @Inject
-        private Instance<SubjectDAO> subjectDAO;
-
-        @Inject
-        private Instance<SubjectFactory> subjectFactory;
-
-        @Inject
-        private Instance<SessionManager> sessionManager;
-
-        @Inject
         private Instance<FilterChainResolver> filterChainResolver;
 
         @Inject
-        private Instance<RememberMeManager> rememberMeManager;
-
-        @Inject
-        private Event<WebEnvironment> environmentEvent;
-
-        @Inject
         private ShiroExtension extension;
+
+        @Inject
+        private SecurityManagerConfigurer configurer;
+
+        @Inject
+        private Event<Environment> environmentEvent;
 
         @Override
         public void init(final FilterConfig filterConfig) throws ServletException {
@@ -167,51 +133,13 @@ public class ShiroSetup implements ServletContainerInitializer {
         @Override
         protected WebEnvironment createEnvironment(final ServletContext sc) {
             final DefaultWebEnvironment environment = new DefaultWebEnvironment();
-            securityManager = configureManager(!extension.isSecurityManager() ? extension.newSecurityManager() : manager.get());
+            securityManager = configurer.configureManager(!extension.isSecurityManager() ? extension.getSecurityManager() : manager.get());
             environment.setSecurityManager(securityManager);
             if (environment.getFilterChainResolver() == null && !filterChainResolver.isUnsatisfied()) {
                 environment.setFilterChainResolver(filterChainResolver.get());
             }
-            environmentEvent.fire(environment); // to customize it
+            environmentEvent.fire(environment);
             return environment;
-        }
-
-        // here we use that philosophy: if set it was configured in the security manager producer otherwise use the produced value if there
-        private SecurityManager configureManager(final SecurityManager manager) {
-            if (!DefaultWebSecurityManager.class.isInstance(manager)) {
-                return manager;
-            }
-            final DefaultWebSecurityManager mgr = DefaultWebSecurityManager.class.cast(manager);
-            if ((mgr.getRealms() == null || mgr.getRealms().isEmpty()) && !realm.isUnsatisfied()) {
-                mgr.setRealms(stream(realm.spliterator(), false).collect(toList()));
-            }
-            if (mgr.getAuthenticator() == null && !authenticator.isUnsatisfied()) {
-                mgr.setAuthenticator(authenticator.get());
-            }
-            if (mgr.getAuthorizer() == null && !authorizer.isUnsatisfied()) {
-                mgr.setAuthorizer(authorizer.get());
-            }
-            if (mgr.getCacheManager() == null && !cacheManager.isUnsatisfied()) {
-                mgr.setCacheManager(cacheManager.get());
-            }
-            if (mgr.getEventBus() == null && !eventBus.isUnsatisfied()) {
-                mgr.setEventBus(eventBus.get());
-            }
-            if (mgr.getSubjectDAO() == null && !subjectDAO.isUnsatisfied()) {
-                mgr.setSubjectDAO(subjectDAO.get());
-            }
-            if (mgr.getSubjectFactory() == null && !subjectFactory.isUnsatisfied()) {
-                mgr.setSubjectFactory(subjectFactory.get());
-            } else if (mgr.getSubjectFactory() == null) {
-                mgr.setSubjectFactory(new DefaultWebSubjectFactory());
-            }
-            if (mgr.getSessionManager() == null && !sessionManager.isUnsatisfied()) {
-                mgr.setSessionManager(sessionManager.get());
-            }
-            if (mgr.getRememberMeManager() == null && !rememberMeManager.isUnsatisfied()) {
-                mgr.setRememberMeManager(rememberMeManager.get());
-            }
-            return manager;
         }
     }
 }

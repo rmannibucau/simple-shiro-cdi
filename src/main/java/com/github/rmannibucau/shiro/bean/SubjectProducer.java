@@ -1,9 +1,9 @@
 package com.github.rmannibucau.shiro.bean;
 
+import com.github.rmannibucau.shiro.loader.Load;
 import org.apache.shiro.mgt.SecurityManager;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.util.ThreadContext;
-import org.apache.shiro.web.subject.WebSubject;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Produces;
@@ -12,12 +12,14 @@ import java.lang.reflect.Proxy;
 
 @ApplicationScoped
 public class SubjectProducer {
+    private final Class<?>[] interfaces = {Load.load("org.apache.shiro.web.subject.WebSubject", Subject.class)};
+
     @Produces
     // @RequestScoped but why using this which is actually rarely bound so doing a custom impl
     public Subject subject(final SecurityManager manager) {
         return Subject.class.cast(Proxy.newProxyInstance(
                 Thread.currentThread().getContextClassLoader(),
-                new Class<?>[]{WebSubject.class},
+                interfaces,
                 (proxy, method, args) -> {
                     try {
                         final Subject subject = ThreadContext.getSubject();

@@ -8,21 +8,24 @@ import org.apache.shiro.authz.annotation.RequiresGuest;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.apache.shiro.authz.annotation.RequiresRoles;
 import org.apache.shiro.authz.annotation.RequiresUser;
+import org.apache.shiro.mgt.DefaultSecurityManager;
 import org.apache.shiro.mgt.SecurityManager;
-import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
-import org.apache.shiro.web.mgt.WebSecurityManager;
 
 import javax.enterprise.event.Observes;
 import javax.enterprise.inject.spi.AfterBeanDiscovery;
+import javax.enterprise.inject.spi.AfterDeploymentValidation;
 import javax.enterprise.inject.spi.BeanManager;
 import javax.enterprise.inject.spi.BeforeBeanDiscovery;
 import javax.enterprise.inject.spi.Extension;
 import javax.enterprise.inject.spi.ProcessBean;
 import java.util.stream.Stream;
 
+import static com.github.rmannibucau.shiro.loader.Load.load;
+
 public class ShiroExtension implements Extension {
     private boolean securityManager;
     private SecurityManagerBean bean;
+    private SecurityManager manager;
 
     void makeShiroAnnotationsInterceptorBindings(@Observes final BeforeBeanDiscovery beforeBeanDiscovery, final BeanManager bm) {
         Stream.of(RequiresRoles.class, RequiresPermissions.class, RequiresAuthentication.class, RequiresUser.class, RequiresGuest.class)
@@ -44,17 +47,30 @@ public class ShiroExtension implements Extension {
         if (securityManager) {
             return;
         }
-        bean = new SecurityManagerBean();
+        newSecurityManager();
+        bean = new SecurityManagerBean(manager.getClass());
         afterBeanDiscovery.addBean(bean);
+    }
+
+    void initSecurityManagerBean(@Observes final AfterDeploymentValidation afterDeploymentValidation) {
+        if (bean != null) {
+            bean.initSecurityManagerBean(manager);
+        }
     }
 
     public boolean isSecurityManager() {
         return securityManager;
     }
 
-    public SecurityManager newSecurityManager() {
-        final WebSecurityManager manager = new DefaultWebSecurityManager();
-        bean.initSecurityManagerBean(manager);
+    private void newSecurityManager() {
+        try {
+            manager = SecurityManager.class.cast(load("org.apache.shiro.web.mgt.DefaultWebSecurityManager", DefaultSecurityManager.class).newInstance());
+        } catch (final InstantiationException | IllegalAccessException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public SecurityManager getSecurityManager() {
         return manager;
     }
 }

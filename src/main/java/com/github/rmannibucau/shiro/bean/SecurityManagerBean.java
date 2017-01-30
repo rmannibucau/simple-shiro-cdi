@@ -3,7 +3,6 @@ package com.github.rmannibucau.shiro.bean;
 import com.github.rmannibucau.shiro.literal.AnyLiteral;
 import com.github.rmannibucau.shiro.literal.DefaultLiteral;
 import org.apache.shiro.mgt.SecurityManager;
-import org.apache.shiro.web.mgt.WebSecurityManager;
 
 import javax.enterprise.context.Dependent;
 import javax.enterprise.context.spi.CreationalContext;
@@ -17,12 +16,17 @@ import java.util.Set;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 
-public class SecurityManagerBean implements Bean<WebSecurityManager> {
-    private final Set<Type> types = new HashSet<>(asList(WebSecurityManager.class, SecurityManager.class, Object.class));
+public class SecurityManagerBean implements Bean<SecurityManager> {
+    private final Set<Type> types = new HashSet<>(asList(SecurityManager.class, SecurityManager.class, Object.class));
     private final Set<Annotation> qualifiers = new HashSet<>(asList(new DefaultLiteral(), new AnyLiteral()));
-    private WebSecurityManager manager;
+    private SecurityManager manager;
+    private Class<?> type;
 
-    public void initSecurityManagerBean(final WebSecurityManager manager) {
+    public SecurityManagerBean(final Class<?> type) {
+        this.type = type;
+    }
+
+    public void initSecurityManagerBean(final SecurityManager manager) {
         this.manager = manager;
     }
 
@@ -33,7 +37,7 @@ public class SecurityManagerBean implements Bean<WebSecurityManager> {
 
     @Override
     public Class<?> getBeanClass() {
-        return WebSecurityManager.class;
+        return type;
     }
 
     @Override
@@ -42,12 +46,12 @@ public class SecurityManagerBean implements Bean<WebSecurityManager> {
     }
 
     @Override
-    public WebSecurityManager create(final CreationalContext<WebSecurityManager> context) {
+    public SecurityManager create(final CreationalContext<SecurityManager> context) {
         return manager;
     }
 
     @Override
-    public void destroy(final WebSecurityManager instance, final CreationalContext<WebSecurityManager> context) {
+    public void destroy(final SecurityManager instance, final CreationalContext<SecurityManager> context) {
         // no-op
     }
 
